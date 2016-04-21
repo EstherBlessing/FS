@@ -1,84 +1,52 @@
 import numpy as np
-import re
+import csv
+from re import findall
 
+def get_subject_id(path):
+    return findall(r'(PTB.*)-1', path)[0]
 
-name1 = '/home/blesse01/BIOM/procUCSF/fMRI/fMRI/PTB201008-1/funct/rp_aPTB201008-1_0005'
+def row_to_numbers(row):
+    num_list = []
+    for element in row:
+        num_list.append(float(element))
+    return num_list
 
-def get_filename(string):
+def find_displacement(volume):
+    x, y, z, pitch, yaw, roll = row_to_numbers(volume)
+    mm_rotations = (pitch * 50) + (yaw * 50) + (roll * 50)
+    mm_translations = x + y + z
+    displacement = mm_rotations + mm_translations
+    return displacement
 
-    filename = re.findall(r'/home/blesse01/BIOM/procUCSF/fMRI/fMRI/(PTB.*)\-1/', string)[0]
+def get_max_displacement(subject_volumes):
+    max_displacement = 0.0
+    for line in subject_volumes:
+        volume = line.split()
+        displacement = find_displacement(volume)
+        if displacement > max_displacement:
+            max_displacement = displacement
+    return max_displacement
 
-    return filename
+def process_subject(filepath):
+    subject_volumes = open(filepath,'r')
+    subject_id = get_subject_id(filepath)
+    max_displacement = get_max_displacement(subject_volumes) 
+    return subject_id, max_displacement
 
-print get_filename(name1)
+def main():
+    out_file = open('subject_max_displacements.csv', 'w')
+    writer = csv.writer(out_file)
+    writer.writerow(['subject_id', 'max_displacement'])
+    # TODO: get this working with sys.stdin. you'll need to import sys
+    # TODO: read through this code line by line and understand it. use the REPL
+    # to do so.
+    # TODO: figure out unix programs to find all relevant filepaths to pass
+    # into the standard in of this program, something like ..
+    # ls -R | grep 'blah' | python get_motion.py
+    # Get "absolute path", not "relative paths": ls -R   fMRI/PTB123123/funct/PB.txt, /Users/blessing/fMRI/PTB123123/funct/PB.txt
+    for path in ['/Users/estherblessing/code/data/rp_aPTB201299-1_0005.txt']:
+        subject_id, max_displacement = process_subject(path)
+        writer.writerow([subject_id, max_displacement])
 
-def get_motion(filepath):
-
-    # Open the file
-    data = open(filepath,'r')
-    
-    out = []
-    # Look through the data, one line at a time. Note that each line is the 
-    # head movement values (first three are translations, second three are 
-    # rotations in radians).
-    for line in data:
-	# Split line into list of strings.
-	string_list = line.split()
-
-	# Convert list of strings to floats.
-	num_list = []
-	for element in string_list:
-		num_list.append(float(element))
-		
-	# Convert list to numpy array so we can math, 
-	# get last three numbers (rotations in radians) and multiply by 
-        # 50 mm to convert to mm
-	# add these three numbers together to get total rotational displacement.
-	array = np.array(num_list)
-	abs_array = np.abs(array)
-	arrayrad = abs_array[3:]
-	mul = arrayrad * 50
-	rad_sum = mul.sum()
-
-	# get first three numbers (mm translation displacements) and add together
-	arraytrans = abs_array[0:3]
-	trans_sum = arraytrans.sum()
-
-	# add the sums of the rotations and translations together
-	final_sum = rad_sum + trans_sum
-	
-	#append each final sum to one array called out
-	out.append(final_sum)
-
-
-    #Get the maximum displacement over all volumes to return as the function output
-    #together with the filename
-    # first turn out from a list to an array
-    out_array=np.array(out) 
-    maxdisplacement = max(out_array)
-    filename = get_filename(name1)
-    out = (filename, maxdisplacement)
-
-    # Print out a two column matrix where each row is a volume num and 
-    # corresponding max displacement (this is to look at for quality control 
-    # purposes
-
-    volume_num = len(out_array)
-    out_column=out_array.reshape(volume_num,1)
-    volume_list=list(range(volume_num))
-    volume_list_array=np.array(volume_list)
-    volume_column=volume_list_array.reshape(volume_num,1)
-
-    #jpvelez, how do I get these two columns (out_column and volume_column) 
-    #to print out  side by side in a 2 column array where each row is volume number  
-    #and cooresponding total displacement??
-
-    print out_column
-    print volume_column
-    print out
-    #print ????
-    return out
-	
-get_motion("/home/blesse01/BIOM/procUCSF/fMRI/fMRI/PTB201008-1/funct/rp_aPTB201008-1_0005.txt")
-
+main()
 
